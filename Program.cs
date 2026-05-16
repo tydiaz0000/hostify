@@ -11,7 +11,7 @@ builder.Services.Configure<FormOptions>(o =>
 
 var app = builder.Build();
 
-var root = Path.Combine(Directory.GetCurrentDirectory(), "data/sites");
+var root = "/data/sites";
 Directory.CreateDirectory(root);
 
 // =========================
