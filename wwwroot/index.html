@@ -42,7 +42,7 @@
         margin-top: 0;
     }
 
-    input, select, button {
+    input, select, button, input[type="file"]::file-selector-button{
         width: 100%;
         padding: 10px;
         margin: 8px 0;
@@ -82,6 +82,164 @@
         font-size: 12px;
         opacity: 0.8;
     }
+
+    input[type="file"]::file-selector-button {
+        padding: 10px;
+        width: fit-content;
+        margin-right: 8px;
+        border-radius: 6px;
+        border: none;
+        font-size: 14px;
+        background: #3b82f6;
+        color: white;
+        cursor: pointer;
+    }
+
+    input[type="file"]::file-selector-button:hover {
+        background: #2563eb;
+    }
+
+    .button-group {
+  display: inline-flex;
+  align-items: stretch;
+  width: 100%;
+}
+
+.button-group button {
+  border: 1px solid #334155;
+  background: #1e293b;
+  color: white;
+  padding: 10px 16px;
+  cursor: pointer;
+  margin: 0;
+  border-radius: 0;
+  position: relative;
+}
+
+/* Prevent double borders */
+.button-group button:not(:first-child) {
+  margin-left: -1px;
+}
+
+/* Leftmost button */
+.button-group button:first-child {
+  border-top-left-radius: 12px;
+  border-bottom-left-radius: 12px;
+}
+
+/* Rightmost button */
+.button-group button:last-child {
+  border-top-right-radius: 12px;
+  border-bottom-right-radius: 12px;
+}
+
+/* Hover */
+.button-group button:hover {
+  background: #334155;
+  z-index: 1;
+}
+
+/* Active */
+.button-group button.active {
+  background: #2563eb;
+  border-color: #2563eb;
+  z-index: 2;
+}
+.hidden, .message-overlay.hidden, .loading-overlay.hidden {
+  display: none;
+}
+    .loading-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+
+
+.loading-box {
+  background: #0f172a;
+  padding: 24px 28px;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  min-width: 160px;
+  color: white;
+  font-family: Arial, sans-serif;
+}
+
+.loading-text {
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+/* Spinner */
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #334155;
+  border-top: 4px solid #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.message-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.message-box {
+  background: #0f172a;
+  color: white;
+  padding: 20px;
+  border-radius: 16px;
+  width: 320px;
+  max-width: 90%;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+  font-family: Arial, sans-serif;
+}
+
+.message-title {
+  font-size: 18px;
+  font-weight: bold;
+  margin-bottom: 10px;
+}
+
+.message-body {
+  font-size: 14px;
+  opacity: 0.9;
+  margin-bottom: 16px;
+}
+
+.message-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.message-actions button {
+  background: #2563eb;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 10px;
+  color: white;
+  cursor: pointer;
+}
+    
 </style>
 </head>
 
@@ -94,12 +252,20 @@
 
         <h2>Hostify</h2>
 
-        <input id="siteName" placeholder="Site name"/>
+        
 
-        <input type="file" id="zip" accept=".zip"/>
+        <div style="padding-right: 20px; margin-bottom: 8px;">
+            <input id="siteName" placeholder="Site name"/>
 
-        <input type="file" id="folder" webkitdirectory directory multiple />
+            
+        </div>
+        <div class="button-group">
+            <button id="zipButton" onclick="toggleUploadType(true)">Upload Zip File</button>
+            <button id="folderButton" class="active" onclick="toggleUploadType(false)">Upload Folder</button>
+        </div>
+        <input type="file" id="zip" class="hidden" accept=".zip"/>
 
+        <input type="file" id="folder" webkitdirectory directory multiple/>
         <button onclick="uploadSite()">Deploy Site</button>
 
         <hr />
@@ -122,7 +288,23 @@
     </div>
 
 </div>
+<div id="loadingOverlay" class="loading-overlay hidden">
+  <div class="loading-box">
+    <div class="spinner"></div>
+    <div class="loading-text">Loading...</div>
+  </div>
+</div>
 
+<div id="messageOverlay" class="message-overlay hidden">
+  <div class="message-box">
+    <div id="messageTitle" class="message-title">Message</div>
+    <div id="messageBody" class="message-body">...</div>
+
+    <div class="message-actions">
+      <button onclick="closeMessage()">Close</button>
+    </div>
+  </div>
+</div>
 <script>
 let currentSite = null;
 
@@ -146,7 +328,26 @@ async function loadSites() {
         container.appendChild(div);
     });
 }
+function showLoading() {
+  const overlay = document.getElementById("loadingOverlay");
+  overlay.classList.remove("hidden");
+}
 
+function hideLoading() {
+  const overlay = document.getElementById("loadingOverlay");
+  overlay.classList.add("hidden");
+}
+
+function showMessage(title, message) {
+  document.getElementById("messageTitle").textContent = title;
+  document.getElementById("messageBody").textContent = message;
+
+  document.getElementById("messageOverlay").classList.remove("hidden");
+}
+
+function closeMessage() {
+  document.getElementById("messageOverlay").classList.add("hidden");
+}
 // ----------------------
 // Select site
 // ----------------------
@@ -190,14 +391,50 @@ async function uploadSite() {
 
     for (let f of folder) {
         form.append("files", f, f.webkitRelativePath || f.name);
-    }
+    }  
+    showLoading();
 
-    await fetch("/api/upload", {
+    try {
+        await fetch("/api/upload", {
         method: "POST",
         body: form
     });
-
     await loadSites();
+    }
+    catch (e) {
+        showMessage("Error", e.message);
+    }
+
+    
+    hideLoading();
+    showMessage("Success", "Website is now being hosted.");
+}
+function addClassIfMissing(element, className) {
+  if (!element.classList.contains(className)) {
+    element.classList.add(className);
+  }
+}
+function removeClassIfExists(element, className) {
+  if (element.classList.contains(className)) {
+    element.classList.remove(className);
+  }
+}
+function toggleUploadType(isZip) {
+    if (isZip) {
+        removeClassIfExists(document.getElementById("folderButton"), "active");
+        removeClassIfExists(document.getElementById("zip"), "hidden");
+        document.getElementById("zip").value = null;
+        addClassIfMissing(document.getElementById("folder"), "hidden");
+        addClassIfMissing(document.getElementById("zipButton"), "active");
+
+    } else {
+        removeClassIfExists(document.getElementById("zipButton"), "active");
+        removeClassIfExists(document.getElementById("folder"), "hidden");
+        document.getElementById("folder").value = null;
+        addClassIfMissing(document.getElementById("zip"), "hidden");
+        addClassIfMissing(document.getElementById("folderButton"), "active");
+        
+    }
 }
 
 // ----------------------
@@ -207,8 +444,9 @@ async function setHome() {
     if (!currentSite) return;
 
     let home = document.getElementById("htmlFiles").value;
-
-    await fetch("/api/set-home", {
+    showLoading();
+    try {
+        await fetch("/api/set-home", {
         method: "POST",
         headers: {
             "Content-Type": "application/json"
@@ -218,14 +456,21 @@ async function setHome() {
             home: home
         })
     });
-
+    } catch {
+        showMessage("Error", e.message);
+    }
+    
+    hideLoading();
+    showMessage("Success", "Home page was set.");
     document.getElementById("preview").src = "/" + currentSite;
 }
 
 // ----------------------
 // Init
 // ----------------------
+showLoading();
 loadSites();
+hideLoading();
 </script>
 
 </body>
