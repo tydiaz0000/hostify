@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Hostify</title>
+
+<style>
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #0b0f19;
+    color: white;
+}
+
+.container {
+    display: flex;
+    height: 100vh;
+}
+
+/* SIDEBAR */
+.sidebar {
+    width: 320px;
+    background: #111827;
+    padding: 15px;
+    overflow-y: auto;
+}
+
+.site {
+    padding: 10px;
+    background: #1f2937;
+    margin-bottom: 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+}
+
+.site:hover {
+    background: #374151;
+}
+
+/* MAIN */
+.main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.topbar {
+    display: flex;
+    gap: 10px;
+    padding: 10px;
+    background: #111827;
+}
+
+button, input, select {
+    padding: 8px;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+}
+
+button {
+    background: #3b82f6;
+    color: white;
+    cursor: pointer;
+}
+
+button:hover {
+    background: #2563eb;
+}
+
+/* FILE MANAGER */
+.file-area {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+}
+
+.files {
+    width: 40%;
+    background: #0f172a;
+    padding: 10px;
+    overflow-y: auto;
+}
+
+.file {
+    padding: 8px;
+    margin-bottom: 6px;
+    background: #1e293b;
+    border-radius: 5px;
+    display: flex;
+    justify-content: space-between;
+    cursor: pointer;
+}
+
+.file:hover {
+    background: #334155;
+}
+
+.preview {
+    flex: 1;
+    border: none;
+    background: white;
+}
+
+/* DROPZONE */
+.dropzone {
+    border: 2px dashed #3b82f6;
+    padding: 10px;
+    text-align: center;
+    margin-bottom: 10px;
+    border-radius: 8px;
+    font-size: 13px;
+    color: #93c5fd;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+        <h3>Sites</h3>
+        <div id="sites"></div>
+    </div>
+
+    <!-- MAIN -->
+    <div class="main">
+
+        <!-- TOP BAR -->
+        <div class="topbar">
+            <input id="siteName" placeholder="site name"/>
+            <input type="file" id="zip"/>
+            <input type="file" id="folder" webkitdirectory directory multiple />
+            <button onclick="upload()">Upload</button>
+
+            <select id="htmlFiles"></select>
+            <button onclick="setHome()">Set Home</button>
+        </div>
+
+        <!-- FILE MANAGER -->
+        <div class="file-area">
+
+            <div class="files">
+
+                <div class="dropzone"
+                     ondrop="dropHandler(event)"
+                     ondragover="event.preventDefault()">
+                    Drag & Drop Files Here
+                </div>
+
+                <h4>Files</h4>
+                <div id="fileList"></div>
+            </div>
+
+            <iframe id="preview" class="preview"></iframe>
+        </div>
+
+    </div>
+</div>
+
+<script>
+let currentSite = null;
+let currentFile = null;
+
+// --------------------
+// LOAD SITES
+// --------------------
+async function loadSites() {
+    let res = await fetch("/api/sites");
+    let sites = await res.json();
+
+    let container = document.getElementById("sites");
+    container.innerHTML = "";
+
+    sites.forEach(site => {
+        let div = document.createElement("div");
+        div.className = "site";
+
+        div.innerHTML = `
+            <span>${site}</span>
+            <button onclick="deleteSite(event,'${site}')">X</button>
+        `;
+
+        div.onclick = () => selectSite(site);
+
+        container.appendChild(div);
+    });
+}
+
+// --------------------
+// SELECT SITE
+// --------------------
+async function selectSite(site) {
+    currentSite = site;
+
+    document.getElementById("preview").src = "/" + site;
+
+    await loadFiles(site);
+}
+
+// --------------------
+// LOAD FILES
+// --------------------
+async function loadFiles(site) {
+    let res = await fetch(`/api/files/${site}`);
+    let files = await res.json();
+
+    let list = document.getElementById("fileList");
+    list.innerHTML = "";
+
+    let select = document.getElementById("htmlFiles");
+    select.innerHTML = "";
+
+    files.forEach(f => {
+
+        // dropdown
+        let opt = document.createElement("option");
+        opt.value = f;
+        opt.innerText = f;
+        select.appendChild(opt);
+
+        // file item
+        let div = document.createElement("div");
+        div.className = "file";
+
+        div.innerHTML = `
+            <span onclick="previewFile('${f}')">${f}</span>
+            <div>
+                <button onclick="renameFile(event,'${f}')">Rename</button>
+                <button onclick="deleteFile(event,'${f}')">Del</button>
+            </div>
+        `;
+
+        list.appendChild(div);
+    });
+}
+
+// --------------------
+// PREVIEW FILE
+// --------------------
+function previewFile(file) {
+    if (!currentSite) return;
+    document.getElementById("preview").src =
+        "/" + currentSite + "/" + file;
+}
+
+// --------------------
+// UPLOAD
+// --------------------
+async function upload() {
+    let form = new FormData();
+
+    form.append("name", document.getElementById("siteName").value);
+
+    let zip = document.getElementById("zip").files[0];
+    if (zip) form.append("zip", zip);
+
+    let folder = document.getElementById("folder").files;
+    for (let f of folder) {
+        form.append("files", f, f.webkitRelativePath || f.name);
+    }
+
+    await fetch("/api/upload", {
+        method: "POST",
+        body: form
+    });
+
+    loadSites();
+}
+
+// --------------------
+// SET HOME
+// --------------------
+async function setHome() {
+    let home = document.getElementById("htmlFiles").value;
+
+    await fetch("/api/set-home", {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({
+            site: currentSite,
+            home: home
+        })
+    });
+
+    document.getElementById("preview").src = "/" + currentSite;
+}
+
+// --------------------
+// DELETE SITE
+// --------------------
+async function deleteSite(e, site) {
+    e.stopPropagation();
+
+    if (!confirm("Delete site?")) return;
+
+    await fetch("/api/delete-site/" + site, {
+        method: "DELETE"
+    });
+
+    loadSites();
+}
+
+// --------------------
+// DELETE FILE
+// --------------------
+async function deleteFile(e, file) {
+    e.stopPropagation();
+
+    if (!confirm("Delete file?")) return;
+
+    await fetch(`/api/delete-file/${currentSite}/${file}`, {
+        method: "DELETE"
+    });
+
+    loadFiles(currentSite);
+}
+
+// --------------------
+// RENAME FILE
+// --------------------
+async function renameFile(e, file) {
+    e.stopPropagation();
+
+    let newName = prompt("New name:", file);
+    if (!newName) return;
+
+    await fetch(`/api/rename-file/${currentSite}`, {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({
+            old: file,
+            new: newName
+        })
+    });
+
+    loadFiles(currentSite);
+}
+
+// --------------------
+// DRAG & DROP UPLOAD
+// --------------------
+async function dropHandler(ev) {
+    ev.preventDefault();
+
+    let form = new FormData();
+    form.append("name", currentSite);
+
+    for (let f of ev.dataTransfer.files) {
+        form.append("files", f, f.name);
+    }
+
+    await fetch("/api/upload", {
+        method: "POST",
+        body: form
+    });
+
+    loadFiles(currentSite);
+}
+
+// INIT
+loadSites();
+</script>
+
+</body>
+</html>

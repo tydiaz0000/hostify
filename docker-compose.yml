@@ -1,0 +1,17 @@
+services:
+  hostify:
+    build: .
+    container_name: hostify
+    ports:
+      - "8082:8080"
+    volumes:
+      - ./Data/sites:/data/sites
+    environment:
+      - ASPNETCORE_URLS=http://+:8080
+    restart: unless-stopped
+    networks:
+      - internal
+
+networks:
+  internal:
+    external: true
