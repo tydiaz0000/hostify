@@ -275,11 +275,13 @@
 
         <hr />
 
-        <h3>Homepage</h3>
-        <select id="htmlFiles"></select>
-        <button onclick="setHome()">Set as homepage</button>
+        <div id="homepageDiv" class="hidden">
+            <h3>Homepage</h3>
+            <select id="htmlFiles"></select>
+            <button onclick="setHome()">Set as homepage</button>
 
-        <div class="small" id="currentSiteLabel"></div>
+            <div class="small" id="currentSiteLabel"></div>
+        </div>
     </div>
 
     <!-- MAIN PREVIEW -->
@@ -288,23 +290,23 @@
     </div>
 
 </div>
-<div id="loadingOverlay" class="loading-overlay hidden">
-  <div class="loading-box">
-    <div class="spinner"></div>
-    <div class="loading-text">Loading...</div>
-  </div>
-</div>
-
-<div id="messageOverlay" class="message-overlay hidden">
-  <div class="message-box">
-    <div id="messageTitle" class="message-title">Message</div>
-    <div id="messageBody" class="message-body">...</div>
-
-    <div class="message-actions">
-      <button onclick="closeMessage()">Close</button>
+    <div id="loadingOverlay" class="loading-overlay hidden">
+    <div class="loading-box">
+        <div class="spinner"></div>
+        <div class="loading-text">Loading...</div>
     </div>
-  </div>
-</div>
+    </div>
+
+    <div id="messageOverlay" class="message-overlay hidden">
+    <div class="message-box">
+        <div id="messageTitle" class="message-title">Message</div>
+        <div id="messageBody" class="message-body">...</div>
+
+        <div class="message-actions">
+        <button onclick="closeMessage()">Close</button>
+        </div>
+    </div>
+    </div>
 <script>
 let currentSite = null;
 
@@ -353,24 +355,30 @@ function closeMessage() {
 // ----------------------
 async function selectSite(site) {
     currentSite = site;
+    removeClassIfExists(document.getElementById("homepageDiv"), "hidden");
 
     document.getElementById("currentSiteLabel").innerText =
         "Selected: " + site;
 
     document.getElementById("preview").src = "/" + site;
+    showLoading();
+    try {
+        let res = await fetch(`/api/files/${site}`);
+        let files = await res.json();
 
-    let res = await fetch(`/api/files/${site}`);
-    let files = await res.json();
+        let sel = document.getElementById("htmlFiles");
+        sel.innerHTML = "";
 
-    let sel = document.getElementById("htmlFiles");
-    sel.innerHTML = "";
-
-    files.forEach(f => {
-        let opt = document.createElement("option");
-        opt.value = f;
-        opt.innerText = f;
-        sel.appendChild(opt);
-    });
+        files.forEach(f => {
+            let opt = document.createElement("option");
+            opt.value = f;
+            opt.innerText = f;
+            sel.appendChild(opt);
+        });
+    } catch (e) {
+        showMessage("Error", e.message);
+    }
+    hideLoading();
 }
 
 // ----------------------
@@ -437,40 +445,40 @@ function toggleUploadType(isZip) {
     }
 }
 
-// ----------------------
-// Set homepage
-// ----------------------
-async function setHome() {
-    if (!currentSite) return;
+    // ----------------------
+    // Set homepage
+    // ----------------------
+    async function setHome() {
+        if (!currentSite) return;
 
-    let home = document.getElementById("htmlFiles").value;
-    showLoading();
-    try {
-        await fetch("/api/set-home", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-            site: currentSite,
-            home: home
-        })
-    });
-    } catch {
-        showMessage("Error", e.message);
+        let home = document.getElementById("htmlFiles").value;
+        showLoading();
+        try {
+            await fetch("/api/set-home", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                site: currentSite,
+                home: home
+            })
+        });
+        } catch {
+            showMessage("Error", e.message);
+        }
+        
+        hideLoading();
+        showMessage("Success", "Home page was set.");
+        document.getElementById("preview").src = "/" + currentSite;
     }
-    
-    hideLoading();
-    showMessage("Success", "Home page was set.");
-    document.getElementById("preview").src = "/" + currentSite;
-}
 
-// ----------------------
-// Init
-// ----------------------
-showLoading();
-loadSites();
-hideLoading();
+    // ----------------------
+    // Init
+    // ----------------------
+    showLoading();
+    loadSites();
+    hideLoading();
 </script>
 
 </body>
